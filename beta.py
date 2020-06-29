@@ -31,6 +31,7 @@ mycursor.execute("CREATE TABLE IF NOT EXISTS `car_catalog` ("
 
 mydb.commit()
 
+
 class Getter:
     def __init__(self):
         with open('proxies.txt', 'r') as f:
@@ -91,6 +92,8 @@ class AutoScrapper():
         # 2 classes of cars
         if next_reveal is None:
             next_reveal = last_div.find('a', class_='navlabellink nvoffset nimportant')
+        if next_reveal is None:
+            next_reveal = last_div.find('a', class_='navlabellink nvoffset nreversevideo')
         brand_name = next_reveal.text
         next_link = next_reveal['href']
         return (brand_name, 'https://www.rockauto.com' + next_link)
@@ -143,7 +146,8 @@ class AutoScrapper():
                 applied_details = row.find_all('span', title="Buyer's Guide")[0].text
                 if applied_details is None:
                     applied_details = table.find_all('span',
-                                                 class_='listing-final-partnumber  as-link-if-js buyers-guide-color')[0].text
+                                                     class_='listing-final-partnumber  as-link-if-js buyers-guide-color')[
+                        0].text
             except IndexError:
                 applied_details = ''
 
@@ -158,25 +162,47 @@ class AutoScrapper():
         brand_links = self.get_all_brands_dict()
         for brand in brand_links:
             print('Parsing', brand)
-            years_dct = self.get_node(brand_links[brand], brand)
+            try:
+                years_dct = self.get_node(brand_links[brand], brand)
+            except:
+                print('Unknown Error, skipping', brand_links[brand])
+                continue
             for year in years_dct:
                 print('  Parsing', year)
-                models = self.get_node(years_dct[year], year)
+                try:
+                    models = self.get_node(years_dct[year], year)
+                except:
+                    print('Unknown Error, skipping', years_dct[year])
+                    continue
                 for model in models:
                     print('\tParsing', model)
-                    volumes = self.get_node(models[model], model)
+                    try:
+                        volumes = self.get_node(models[model], model)
+                    except:
+                        print('Unknown Error, skipping', models[model])
+                        continue
                     for volume in volumes:
                         print('\t  Parsing', volume)
-                        parts = self.get_node(volumes[volume], volume)
+                        try:
+                            parts = self.get_node(volumes[volume], volume)
+                        except:
+                            print('Unknown Error, skipping', volumes[volume])
+                            continue
                         for part in parts:
                             print('        Parsing', part)
-                            ex_parts = self.get_node(parts[part], part)
-                            # if len(ex_parts) == 1:
-                            #     price, number, applied_details = self.get_price()
+                            try:
+                                ex_parts = self.get_node(parts[part], part)
+                            except:
+                                print('Unknown Error, skipping', parts[part])
+                                continue
                             if ex_parts:
                                 for ex in ex_parts:
                                     print('        Parsing', ex)
-                                    price, number, applied_details = self.get_price(ex_parts[ex])
+                                    try:
+                                        price, number, applied_details = self.get_price(ex_parts[ex])
+                                    except:
+                                        print('Unknown error', ex_parts[ex])
+                                        continue
                                     for i in range(len(price)):
                                         res = {'brand': brand,
                                                'year': year,
@@ -189,12 +215,18 @@ class AutoScrapper():
                                                'price': price[i],
                                                'part_url': ex_parts[ex]}
                                         print(res)
-                                        with open('res.csv', 'a') as f:
-                                            for val in res.values():
-                                                f.write(val + ';')
-                                            f.write('\n')
-                                        mycursor.execute(INSERT_INTO % tuple(res.values()))
-                                        mydb.commit()
+                                        try:
+                                            with open('res.csv', 'a') as f:
+                                                for val in res.values():
+                                                    f.write(val + ';')
+                                                f.write('\n')
+                                        except:
+                                            print('Failed to save into CSV')
+                                        try:
+                                            mycursor.execute(INSERT_INTO % tuple(res.values()))
+                                            mydb.commit()
+                                        except:
+                                            print('Failed to write into Database')
                         print('\nPROCESSED PARTS\n')
                     print('\nPROCESSED VOLUMES\n')
                 print('\nPROCESSED MODELS\n')
